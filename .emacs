@@ -1,92 +1,115 @@
-;; Load package manager
-(require 'package)
-(dolist (source '(("marmalade" . "http://marmalade-repo.org/packages")
-				  ("elpa" . "http://tromey.com/elpa/")
-				  ("melpa" . "http://melpa.milkbox.net/packages/")
-				  ))
-  (add-to-list 'package-archives source t))
-(package-initialize)
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Emacs init file
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-;; Required packages
-(when (not package-archive-contents)
-  (package-refresh-contents))
-(defvar tmtxt/packages
-  '(ssh multi-term solarized-theme xcscope))
-(dolist (p tmtxt/packages)
-  (when (not (package-installed-p p))
-	(package-install p)))
+;; Load common lisp
+(require 'cl)
 
-;; Set up xcscope
-(require 'xcscope)
-(cscope-setup)
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Packages
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-;; Set up c mode
-(require 'cc-mode)
+;; Enable Package manager if version supports it
+(when (>= emacs-major-version 24)
+  (require 'package)
+  (setq package-archives '(("gnu" . "http://elpa.gnu.org/packages/")
+			   ("marmalade" . "https://marmalade-repo.org/packages/")
+			   ("melpa" . "http://melpa.org/packages/")))
+  (package-initialize)
 
-;; Set up C indents
-(setq-default c-basic-offset 4 c-default-style "linux")
-(setq-default tab-width 4 indent-tabs-mode t)
-(define-key c-mode-base-map (kbd "RET") 'newline-and-indent)
+  ;; Define packages to be installed on launch if not already installed
+  (defvar af-packages
+    '(monokai-theme
+      smart-mode-line
+      smart-mode-line-powerline-theme
+      switch-window))
 
-;; Auto pair brackets
-(electric-pair-mode +1)
+  ;; Function to check if any packages are missing
+  (defun check-packages-installed-p ()
+    (cl-every 'package-installed-p af-packages))
 
-;; Set solarised dark theme
-(load-theme 'solarized-dark t)
+  ;; If any packages are not installed, install packages
+  (unless (check-packages-installed-p)
+    ;; Check for new packages / versions
+    (message "%s" "Refreshing package database...")
+    (package-refresh-contents)
+    (message "%s" "done.")
+    ;; Install missing packages
+    (dolist (p af-packages)
+      (when (not (package-installed-p p))
+	(package-install p))))
 
-;; Set up company
-(eval-after-load 'company
-  '(add-to-list 'company-backends 'company-irony))
+  ;; Load packages
+  (provide 'af-packages)
+)
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; UI
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-;; (optional) adds CC special commands to `company-begin-commands' in order to
-;; trigger completion at interesting places, such as after scope operator
-;;     std::|
-(add-hook 'irony-mode-hook 'company-irony-setup-begin-commands)
+;; Enable monokai color theme
+(load-theme 'monokai)
 
-;; set up irony
-(add-hook 'c++-mode-hook 'irony-mode)
-(add-hook 'c-mode-hook 'irony-mode)
-(add-hook 'objc-mode-hook 'irony-mode)
+;; Smart mode line theme
+(setq sml/theme 'powerline)
 
-;; replace the `completion-at-point' and `complete-symbol' bindings in
-;; irony-mode's buffers by irony-mode's function
-(defun my-irony-mode-hook ()
-  (define-key irony-mode-map [remap completion-at-point]
-    'irony-completion-at-point-async)
-  (define-key irony-mode-map [remap complete-symbol]
-    'irony-completion-at-point-async))
-(add-hook 'irony-mode-hook 'my-irony-mode-hook)
-(add-hook 'irony-mode-hook 'irony-cdb-autosetup-compile-options)
-(add-hook 'c++-mode-hook 'irony-mode)
-(add-hook 'c-mode-hook 'irony-mode)
-(add-hook 'objc-mode-hook 'irony-mode)
+;; Garantee fixed width mode line 
+(setq sml/shorten-directory t)
+(setq sml/shorten-modes t)
 
+;; Set width of mode line
+(setq sml/name-width 40)
+(setq sml/mode-width 'full)
 
-;; set up multi-term
-(setq multi-term-program "/bin/bash")
-(add-hook 'term-mode-hook
-		  (lambda ()
-			(setq show-trailing-whitespace nil)
-			))
+(sml/setup)
 
 
-(multi-term) ;; open multi-term 1
-(multi-term) ;; open multi-term 2
-(multi-term) ;; open multi-term 3
-(multi-term) ;; open multi-term 4
-(global-set-key (kbd "M-1")
-				(lambda ()
-				  (interactive)
-				  (switch-to-buffer "*terminal<1>*")))
-(global-set-key (kbd "M-2")
-				(lambda ()
-				  (interactive)
-				  (switch-to-buffer "*terminal<2>*")))
-(global-set-key (kbd "M-3")
-				(lambda ()
-				  (interactive)
-				  (switch-to-buffer "*terminal<3>*")))
-(global-set-key (kbd "M-4")
-				(lambda ()
-				  (interactive)
-				  (switch-to-buffer "*terminal<4>*")))
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Terminal
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defun visit-term-buffer ()
+  (interactive)
+  (if (not (get-buffer "*ansi-term*"))
+      (progn
+	(split-window-sensibly (selected-window))
+	(other-window 1)
+	(ansi-term (getenv "SHELL")))
+    (switch-to-buffer-other-window "*ansi-term*")))
+
+;; Bind function to C-c t
+(global-set-key (kbd "C-c t") 'visit-term-buffer)
+
+;;**** TODO numbered terminals ie. C-c t, prompt for n, go to *ansi-term*<n> ****
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Buffers / panes
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; Enable winner mode - reverts split pane config
+;; winner-undo (C-c <-)
+;; winner-redo (C-c ->)
+(winner-mode 1)
+
+;; Enable switch window
+(global-set-key (kbd "C-x o") 'switch-window)
+
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Custom - DO NOT EDIT
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(custom-set-variables
+ ;; custom-set-variables was added by Custom.
+ ;; If you edit it by hand, you could mess it up, so be careful.
+ ;; Your init file should contain only one such instance.
+ ;; If there is more than one, they won't work right.
+ '(custom-safe-themes
+   (quote
+    ("26614652a4b3515b4bbbb9828d71e206cc249b67c9142c06239ed3418eff95e2" "05c3bc4eb1219953a4f182e10de1f7466d28987f48d647c01f1f0037ff35ab9a" default))))
+(custom-set-faces
+ ;; custom-set-faces was added by Custom.
+ ;; If you edit it by hand, you could mess it up, so be careful.
+ ;; Your init file should contain only one such instance.
+ ;; If there is more than one, they won't work right.
+ )
